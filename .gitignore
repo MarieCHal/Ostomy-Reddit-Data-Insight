@@ -1,0 +1,9 @@
+# Environnement Python local (jamais versionné)
+.venv
+.venv/
+**/.venv/
+
+__pycache__/
+*.pyc
+.DS_Store
+data_brutes/
