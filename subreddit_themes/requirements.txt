@@ -1,0 +1,11 @@
+# BART-MNLI zero-shot (classify_subreddit_posts.py)
+torch>=2.0.0
+transformers>=4.36.0
+accelerate>=0.25.0
+sentencepiece>=0.1.99
+safetensors>=0.4.0
+PyYAML>=6.0
+
+# Lightweight Excel report (report_workbook.py)
+pandas>=2.0.0
+openpyxl>=3.1.0

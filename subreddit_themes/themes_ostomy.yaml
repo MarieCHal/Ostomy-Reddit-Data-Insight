@@ -1,0 +1,19 @@
+# Candidate labels for zero-shot classification (BART-MNLI). Keep them in English.
+hypothesis_template: "This post discusses {}."
+
+labels:
+  - medical symptoms and complications
+  - surgery and hospital experience
+  - ostomy reversal or takedown
+  - ileostomy care and routine
+  - colostomy care and routine
+  - urostomy and bladder topics
+  - pouch leaks and appliance adhesion
+  - peristomal skin problems
+  - diet hydration and output consistency
+  - mental health and coping
+  - relationships intimacy and social life
+  - work travel and daily activities
+  - product recommendations and brands
+  - insurance and healthcare access
+  - humor or community chat
