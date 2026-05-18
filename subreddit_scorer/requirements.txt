@@ -1,0 +1,9 @@
+# RoBERTa sentiment (score_subreddit_posts.py)
+torch>=2.0.0
+transformers>=4.36.0
+accelerate>=0.25.0
+safetensors>=0.4.0
+
+# Excel report (report_workbook.py)
+pandas>=2.0.0
+openpyxl>=3.1.0

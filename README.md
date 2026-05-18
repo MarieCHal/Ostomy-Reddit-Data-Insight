@@ -19,6 +19,7 @@ Ce dépôt est organisé autour d’un pipeline léger type **ETL** : extraction
 |---------|------|
 | [`subreddit_extract/extract_subreddit.py`](subreddit_extract/extract_subreddit.py) | **Script** d’extraction autonome (`requests` seul) : logs terminal, sortie sous `results/`. Voir [`subreddit_extract/COMMANDES.md`](subreddit_extract/COMMANDES.md). |
 | [`subreddit_themes/`](subreddit_themes/COMMANDES.md) | **Thèmes (BART-MNLI)** : classification zero-shot sur un `posts.jsonl` déjà extrait, sorties `posts.themes.jsonl` + Excel allégé. Voir [`subreddit_themes/COMMANDES.md`](subreddit_themes/COMMANDES.md). |
+| [`subreddit_scorer/`](subreddit_scorer/COMMANDES.md) | **Sentiment (RoBERTa)** : polarité + index −1…+1 sur `posts.jsonl`, sorties `posts.sentiment.jsonl` + rapport Excel corpus. Voir [`subreddit_scorer/COMMANDES.md`](subreddit_scorer/COMMANDES.md). |
 | [`reddit_extract.py`](reddit_extract.py), [`ostomy_common.py`](ostomy_common.py) | Pipeline **historique** inchangé : extraction + analyse dans un même module partagé (charge spaCy, NLTK, VADER à l’import). |
 | [`ostomy_analyze.py`](ostomy_analyze.py) | Analyse sur JSONL déjà téléchargé (réseau non requis). |
 | [`VARIANTES_ET_BIAIS.md`](VARIANTES_ET_BIAIS.md) | Variantes d’extraction, biais, limites Reddit (pagination, exhaustivité, etc.). |
@@ -59,6 +60,19 @@ python3 subreddit_themes/report_workbook.py --run-dir results/.../limit_N
 
 Détails, options (`--device`, `--limit`, YAML des sujets en anglais) : [`subreddit_themes/COMMANDES.md`](subreddit_themes/COMMANDES.md).
 
+## Étape 3 — sentiment (RoBERTa), hors pipeline historique
+
+Après extraction, un environnement PyTorch peut charger le modèle Twitter-RoBERTa sentiment :
+
+```bash
+python3 -m venv .venv-scorer && source .venv-scorer/bin/activate
+pip install -r subreddit_scorer/requirements.txt
+python3 subreddit_scorer/score_subreddit_posts.py -i results/.../extract/posts.jsonl
+python3 subreddit_scorer/report_workbook.py --run-dir results/.../limit_N
+```
+
+Cadrage (choix du modèle, index de polarité) : [`points_a_clarifier/scorer_sentiment_roberta.md`](points_a_clarifier/scorer_sentiment_roberta.md). Options : [`subreddit_scorer/COMMANDES.md`](subreddit_scorer/COMMANDES.md).
+
 ## Dépendances complètes (analyse + Excel comme avant)
 
 ```bash
@@ -69,7 +83,8 @@ python3 -m spacy download en_core_web_sm
 ## Fichiers produits par l’extracteur moderne
 
 - Sous **`extract/`** : `posts.jsonl`, `posts.meta.json` (étape extraction).
-- Sous **`themes/`** (après classification) : `posts.themes.jsonl`, rapport Excel, etc.
+- Sous **`themes/`** (après classification) : `posts.themes.jsonl`, rapport Excel thèmes, etc.
+- Sous **`scorer/`** (après sentiment) : `posts.sentiment.jsonl`, rapport Excel corpus, etc.
 
 Arborescence détaillée : [`results/README.md`](results/README.md).
 
