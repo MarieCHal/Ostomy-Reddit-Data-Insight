@@ -2,7 +2,7 @@
 
 Étape distincte de l’extraction ([`subreddit_extract/`](../subreddit_extract/COMMANDES.md)) et des thèmes ([`subreddit_themes/`](../subreddit_themes/COMMANDES.md)) : **sentiment** avec **`cardiffnlp/twitter-roberta-base-sentiment-latest`**, puis rapport Excel corpus (posts + sentiment + thèmes si disponibles).
 
-Cadrage méthodo : [`points_a_clarifier/scorer_sentiment_roberta.md`](../points_a_clarifier/scorer_sentiment_roberta.md).
+Cadrage méthodo (choix RoBERTa, alternatives à tester, phrases pour le mémoire) : [`points_a_clarifier/scorer_sentiment_roberta.md`](../points_a_clarifier/scorer_sentiment_roberta.md).
 
 ## Environnement
 
@@ -38,7 +38,7 @@ Options utiles :
 
 | Option | Description |
 |--------|-------------|
-| `--model ID` | Modèle Hugging Face (défaut : twitter-roberta sentiment). |
+| `--model ID` | Modèle Hugging Face (défaut : `cardiffnlp/twitter-roberta-base-sentiment-latest`). Autres idées : voir le tableau dans `points_a_clarifier/scorer_sentiment_roberta.md`. |
 | `--device auto\|cpu\|cuda\|mps` | Accélérateur. |
 | `--batch-size N` | Taille de lot (défaut : 8). |
 | `--limit N` | Ne traiter que les N premiers posts (tests). |
