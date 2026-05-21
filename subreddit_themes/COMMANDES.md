@@ -1,6 +1,8 @@
 # Thèmes BART-MNLI (`subreddit_themes/`)
 
-Étape distincte de l’extraction ([`subreddit_extract/`](../subreddit_extract/COMMANDES.md)) : classification **zero-shot** avec **`facebook/bart-large-mnli`**, puis rapport Excel allégé.
+Étape distincte de l’extraction ([`subreddit_extract/`](../subreddit_extract/COMMANDES.md)) : classification **zero-shot multi-label** avec **`facebook/bart-large-mnli`**, taxonomie MSC (13 catégories), puis rapport Excel.
+
+Taxonomie de référence : [`draft_guide_themes/taxonomy_ostomy_roberta.md`](../draft_guide_themes/taxonomy_ostomy_roberta.md)
 
 ## Environnement
 
@@ -25,14 +27,16 @@ python3 subreddit_themes/classify_subreddit_posts.py \
 
 Sorties dans le sous-dossier **`themes/`** du même run (créé automatiquement si l’entrée est sous `extract/`) :
 
-- `themes/posts.themes.jsonl` — une ligne par post avec `theme_label`, `theme_score`, `theme_scores`.
-- `themes/posts.themes.meta.json` — modèle, liste des labels, instant UTC, etc.
+- `themes/posts.themes.jsonl` — une ligne par post avec `theme_labels`, `theme_scores`, `theme_label` (top-1).
+- `themes/posts.themes.meta.json` — modèle, seuil, troncature, liste des catégories.
 
 Options utiles :
 
 | Option | Description |
 |--------|-------------|
-| `--themes PATH` | Fichier YAML des sujets (défaut : `subreddit_themes/themes_ostomy.yaml`). |
+| `--themes PATH` | Fichier YAML des catégories (défaut : `subreddit_themes/themes_ostomy.yaml`). |
+| `--threshold FLOAT` | Seuil par label (défaut : 0.40 depuis le YAML). |
+| `--max-chars N` | Troncature title+body (défaut : 1000 depuis le YAML). |
 | `--device auto\|cpu\|cuda\|mps` | Accélérateur (`auto` teste CUDA puis MPS puis CPU). |
 | `--limit N` | Ne traiter que les N premiers posts (tests). |
 | `-o PREFIX` | Préfixe sans extension pour les fichiers `.themes.jsonl` / `.themes.meta.json`. |
@@ -46,21 +50,29 @@ python3 subreddit_themes/report_workbook.py \
   --run-dir results/ostomy/2026-01-01_2026-05-14/limit_10
 ```
 
-Équivalent explicite :
-
-```bash
-python3 subreddit_themes/report_workbook.py \
-  -i results/ostomy/2026-01-01_2026-05-14/limit_10/extract/posts.jsonl \
-  -t results/ostomy/2026-01-01_2026-05-14/limit_10/themes/posts.themes.jsonl
-```
-
 Sorties par défaut sous **`themes/`** :
 
 - `themes/posts_Themes_Report.xlsx` — feuilles `Posts_themes`, `Theme_distribution`, `Run_info`.
 - `themes/posts_Themes_Report.report_meta.json` — métadonnées posts + thèmes.
 
-Option `-o chemin/rapport.xlsx` pour fixer le fichier Excel.
+### Colonnes Excel
 
-## Fichier des sujets
+Pour chaque catégorie (`short_name`, ex. `hospital_to_home_transition`) :
 
-Éditer [`themes_ostomy.yaml`](themes_ostomy.yaml) : clé `labels` (liste de chaînes **en anglais**), option `hypothesis_template` (placeholders `{}` pour le label).
+- `score_{short_name}` — score brut 0–1
+- `label_{short_name}` — 1 si score ≥ seuil, 0 sinon
+
+**Filtrage analyste (V0) :**
+
+- Corpus stomie digestive : `label_digestive_relevance = 1`
+- Posts sensibles : repérer `label_crisis_suicidal_ideation = 1` ; exclure des stats quantitatives ou relire manuellement
+
+La feuille `Theme_distribution` compte les posts par label (multi-label : la somme des % peut dépasser 100 %).
+
+## Fichier des catégories
+
+Éditer [`themes_ostomy.yaml`](themes_ostomy.yaml) : 13 catégories avec `hypothesis`, `keywords`, `examples` (doc), `definition`.
+
+**Version 3** : les `keywords` enrichissent l'hypothèse NLI et appliquent un léger boost de score (+0,03 par mot-clé trouvé, plafond +0,12). F0 pénalise les `exclusion_signals` (urostomie, pub…). Les `examples` servent à la relecture humaine, pas au modèle directement.
+
+Pour **reclassifier** après modification du YAML, relancer `classify_subreddit_posts.py` sur le même `posts.jsonl`.

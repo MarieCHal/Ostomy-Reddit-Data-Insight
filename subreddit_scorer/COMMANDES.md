@@ -46,23 +46,39 @@ Options utiles :
 
 **Troncature** : les textes très longs sont coupés au `max_length` du tokenizer (~512 tokens).
 
-## 2. Rapport Excel corpus
+## 2. Rapport Excel corpus (thèmes + sentiment)
 
-Après scoring (idéalement aussi après thèmes, mais pas obligatoire pour scorer) :
+Après scoring **et** thèmes (recommandé) :
 
 ```bash
 python3 subreddit_scorer/report_workbook.py \
   --run-dir results/ostomy/2026-01-01_2026-05-14/limit_10
 ```
 
-Si `themes/posts.themes.jsonl` existe, les colonnes thème sont remplies ; sinon elles restent vides.
+Si `themes/posts.themes.jsonl` existe, le rapport inclut **toutes** les colonnes multi-label (`label_*`, `score_*`) plus le sentiment.
 
 Sorties par défaut sous **`scorer/`** :
 
-- `scorer/posts_Corpus_Report.xlsx` — feuilles `Posts_corpus`, `Sentiment_distribution`, `Theme_distribution` (si thèmes), `Run_info`
+- `scorer/posts_Corpus_Report.xlsx` — feuilles :
+  - **`Guide`** — mode d’emploi pour l’équipe
+  - **`Posts_corpus`** — texte + sentiment + thèmes (tableau principal)
+  - **`Sentiment_distribution`** / **`Theme_distribution`**
+  - **`Run_info`**
 - `scorer/posts_Corpus_Report.report_meta.json`
 
-Le rapport **thèmes seuls** reste produit par [`subreddit_themes/report_workbook.py`](../subreddit_themes/report_workbook.py) sous `themes/`.
+Le rapport **thèmes seuls** (`themes/posts_Themes_Report.xlsx`) reste disponible si vous voulez une vue sans sentiment.
+
+### Colonnes clés (`Posts_corpus`)
+
+| Zone | Colonnes |
+|------|----------|
+| Texte | `text_for_review` (complet, retours à la ligne) |
+| Sentiment | `sentiment_label`, `sentiment_polarity_index` (−1…+1) |
+| Thèmes résumé | `theme_labels` (multi-label, une catégorie par ligne) |
+| Filtres | `label_digestive_relevance`, `label_crisis_suicidal_ideation`, `label_hospital_to_home_transition`, … |
+| Détail | `score_*` pour chaque catégorie |
+
+**Filtres Excel conseillés :** `label_digestive_relevance = 1` ; exclure ou relire `label_crisis_suicidal_ideation = 1`.
 
 ## Ordre des étapes
 

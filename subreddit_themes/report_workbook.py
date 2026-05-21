@@ -11,12 +11,19 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections import Counter
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
+from excel_helpers import (
+    category_order,
+    format_posts_worksheet,
+    infer_category_order,
+    merge_posts_and_themes,
+    posts_column_order,
+    theme_distribution,
+)
 from jsonl_io import read_jsonl, write_json
 from paths import (
     chemin_extract_posts,
@@ -34,55 +41,6 @@ def load_by_id(path: Path) -> dict[str, dict[str, Any]]:
         if pid is not None:
             by_id[str(pid)] = row
     return by_id
-
-
-def merge_posts_and_themes(
-    posts: list[dict[str, Any]],
-    themes_by_id: dict[str, dict[str, Any]],
-) -> list[dict[str, Any]]:
-    merged: list[dict[str, Any]] = []
-    for row in posts:
-        pid = str(row.get("id", ""))
-        t = themes_by_id.get(pid, {})
-        title = (row.get("title") or "") or ""
-        body = (row.get("selftext") or "") or ""
-        text = f"{title}\n{body}".strip() if title and body else (title or body).strip()
-        scores = t.get("theme_scores")
-        if isinstance(scores, dict):
-            scores_json = json.dumps(scores, ensure_ascii=False)
-        else:
-            scores_json = ""
-        merged.append(
-            {
-                "id": row.get("id"),
-                "created_utc": row.get("created_utc"),
-                "title": title,
-                "selftext": body,
-                "text_for_review": text[:8000] + ("…" if len(text) > 8000 else ""),
-                "theme_label": t.get("theme_label"),
-                "theme_score": t.get("theme_score"),
-                "theme_scores_json": scores_json,
-                "theme_classifier_note": t.get("theme_classifier_note", ""),
-            }
-        )
-    return merged
-
-
-def theme_distribution(rows: list[dict[str, Any]]) -> pd.DataFrame:
-    labels = []
-    for r in rows:
-        lab = r.get("theme_label")
-        if lab is None or lab == "":
-            labels.append("(no text / unclassified)")
-        else:
-            labels.append(str(lab))
-    c = Counter(labels)
-    total = sum(c.values()) or 1
-    out = [
-        {"theme": k, "count": v, "percent": round(100.0 * v / total, 2)}
-        for k, v in sorted(c.items(), key=lambda x: (-x[1], x[0]))
-    ]
-    return pd.DataFrame(out)
 
 
 def main() -> None:
@@ -145,7 +103,21 @@ def main() -> None:
 
     posts = read_jsonl(posts_path)
     themes_by_id = load_by_id(themes_path)
-    merged = merge_posts_and_themes(posts, themes_by_id)
+
+    meta_themes: dict[str, Any] = {}
+    themes_meta_path = themes_path.parent / f"{themes_path.stem}.meta.json"
+    if themes_meta_path.is_file():
+        with open(themes_meta_path, encoding="utf-8") as f:
+            meta_themes = json.load(f)
+
+    threshold = meta_themes.get("threshold")
+    threshold_f = float(threshold) if threshold is not None else None
+
+    categories = category_order(meta_themes)
+    if not categories:
+        categories = infer_category_order(themes_by_id)
+
+    merged = merge_posts_and_themes(posts, themes_by_id, categories, threshold_f)
 
     out_xlsx = args.output
     if out_xlsx is None:
@@ -157,6 +129,8 @@ def main() -> None:
     out_xlsx.parent.mkdir(parents=True, exist_ok=True)
 
     df_posts = pd.DataFrame(merged)
+    if not df_posts.empty:
+        df_posts = df_posts[posts_column_order(df_posts, categories)]
     if "created_utc" in df_posts.columns and not df_posts.empty:
         s = pd.to_datetime(
             df_posts["created_utc"], unit="s", utc=True, errors="coerce"
@@ -169,19 +143,13 @@ def main() -> None:
         except (TypeError, AttributeError):
             df_posts["created_utc"] = s
 
-    df_dist = theme_distribution(merged)
+    df_dist = theme_distribution(merged, categories)
 
     meta_posts: dict[str, Any] = {}
     meta_path = posts_path.parent / f"{posts_path.stem}.meta.json"
     if meta_path.is_file():
         with open(meta_path, encoding="utf-8") as f:
             meta_posts = json.load(f)
-
-    meta_themes: dict[str, Any] = {}
-    themes_meta_path = themes_path.parent / f"{themes_path.stem}.meta.json"
-    if themes_meta_path.is_file():
-        with open(themes_meta_path, encoding="utf-8") as f:
-            meta_themes = json.load(f)
 
     run_info = {
         "posts_jsonl": str(posts_path.resolve()),
@@ -205,12 +173,20 @@ def main() -> None:
                     ("posts_jsonl", str(posts_path.resolve())),
                     ("themes_jsonl", str(themes_path.resolve())),
                     ("n_posts", len(merged)),
+                    ("classification_mode", meta_themes.get("classification_mode", "")),
+                    ("threshold", meta_themes.get("threshold", "")),
+                    ("max_text_chars", meta_themes.get("max_text_chars", "")),
+                    ("n_categories", meta_themes.get("n_labels", "")),
                     ("themes_meta_model", meta_themes.get("model", "")),
                     ("themes_meta_instant", meta_themes.get("instant_utc", "")),
                 ]
             ]
         )
         df_info.to_excel(writer, sheet_name="Run_info", index=False)
+        format_posts_worksheet(
+            writer.sheets["Posts_themes"],
+            list(df_posts.columns),
+        )
 
     print(f"Wrote {out_xlsx}")
     print(f"Wrote {info_path}")

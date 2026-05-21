@@ -1,19 +1,455 @@
-# Candidate labels for zero-shot classification (BART-MNLI). Keep them in English.
-hypothesis_template: "This post discusses {}."
+# Taxonomie r/ostomy — classification zero-shot BART-MNLI (multi-label).
+# Référence : draft_guide_themes/taxonomy_ostomy_roberta.md
+#
+# Les champs examples / keywords servent à :
+#   - enrichir l'hypothèse NLI envoyée à BART (keywords)
+#   - booster le score si mots-clés présents dans le post
+#   - documentation / relecture humaine (examples)
+# Les examples ne sont PAS du few-shot RoBERTa — seulement guide métier.
 
-labels:
-  - medical symptoms and complications
-  - surgery and hospital experience
-  - ostomy reversal or takedown
-  - ileostomy care and routine
-  - colostomy care and routine
-  - urostomy and bladder topics
-  - pouch leaks and appliance adhesion
-  - peristomal skin problems
-  - diet hydration and output consistency
-  - mental health and coping
-  - relationships intimacy and social life
-  - work travel and daily activities
-  - product recommendations and brands
-  - insurance and healthcare access
-  - humor or community chat
+version: 3
+classification_mode: multi_label
+threshold: 0.4
+max_text_chars: 1000
+hypothesis_template: '{}'
+enrich_hypothesis_with_keywords: true
+max_keywords_in_hypothesis: 10
+keyword_boost_per_match: 0.03
+keyword_boost_cap: 0.12
+exclusion_penalty: 0.35
+categories:
+- id: F0
+  short_name: digestive_relevance
+  display_name: Relevance filter — Digestive ostomy
+  hypothesis: This post is about living with a colostomy, ileostomy, or intestinal stoma.
+  definition: The post is about a digestive ostomy (colostomy, ileostomy, or unspecified intestinal stoma), not a urinary ostomy, tracheostomy, or unrelated topic.
+  keywords:
+  - colostomy
+  - ileostomy
+  - stoma
+  - ostomy
+  - intestinal stoma
+  - Crohn
+  - UC
+  - bowel surgery
+  examples:
+  - Just had my ileostomy surgery last week, totally overwhelmed
+  - Living with a colostomy for 3 years now and still learning
+  - My Crohn's finally got bad enough that I needed a stoma
+  - Got a loop ileostomy after my UC flare, hoping for reversal
+  - Anyone else have a permanent colostomy after rectal cancer?
+  exclusion_signals:
+  - urostomy
+  - ileal conduit
+  - bladder removal
+  - urinary diversion
+  - tracheostomy
+  - for sale
+  - giveaway
+  - selling supplies
+- id: A1
+  short_name: technical_stoma_care
+  display_name: A1 · Soins et gestion technique de la stomie
+  hypothesis: This post is about the physical management of the stoma appliance, skin care around the stoma, or technical problems like leaks and bag changes.
+  definition: Technical and physical management of the stoma appliance, leaks, skin care, products, complications.
+  keywords:
+  - leaking
+  - wafer
+  - flange
+  - barrier
+  - bag change
+  - appliance
+  - convex
+  - flush stoma
+  - peristomal skin
+  - stoma size
+  - prolapse
+  - retraction
+  - hernia
+  - pouch
+  - seal
+  - ring
+  - paste
+  - adhesive
+  - skin barrier
+  - pouching system
+  - baseplate
+  examples:
+  - My wafer keeps failing after only 2 days, any tips to make it last longer?
+  - Peristomal skin is bright red and burning, tried everything and nothing helps
+  - Which convex plate works best for a flush or slightly retracted stoma?
+  - My stoma prolapsed this morning, do I need to go to the ER right now?
+  - I switched from a one-piece to a two-piece system and my leaks went from daily to zero
+- id: A2
+  short_name: diet_and_output
+  display_name: A2 · Alimentation et gestion du transit
+  hypothesis: This post is about diet, nutrition, food choices, or managing stoma output volume and consistency.
+  keywords:
+  - diet
+  - food
+  - eating
+  - blockage
+  - obstruction
+  - output
+  - dehydration
+  - high output
+  - low residue
+  - fiber
+  - mushrooms
+  - rehydration
+  - popcorn
+  - nuts
+  - drinking
+  - nausea
+  - vomiting
+  - electrolytes
+  - salt
+  - gassy
+  - odor
+  - smell
+  - foods to avoid
+  - can I eat
+  - safe foods
+  examples:
+  - What foods should I absolutely avoid with an ileostomy? Just got home from hospital
+  - I got a partial blockage from eating mushrooms — 12 hours of hell, never again
+  - My output is so high I'm getting dehydrated every day despite drinking 3 litres
+  - Can I ever eat salad again or is leafy greens permanently off the table?
+  - High-output ileostomy — my GI wants to put me on Lomotil but I'm worried about side effects
+- id: A3
+  short_name: access_to_resources
+  display_name: A3 · Accès aux ressources et matériel
+  hypothesis: This post is about access to stoma supplies, insurance coverage, reimbursement costs, or difficulties accessing specialist stoma care.
+  keywords:
+  - insurance
+  - coverage
+  - cost
+  - afford
+  - expensive
+  - prescription
+  - reimbursement
+  - supply
+  - free samples
+  - WOC nurse
+  - stoma nurse
+  - specialist
+  - waiting list
+  - no access
+  - rural
+  - out of pocket
+  - healthcare system
+  - NHS
+  - copay
+  - ordering
+  examples:
+  - My insurance denied coverage for the convex pouches my stoma nurse prescribed — how do I appeal?
+  - Does anyone know if ostomy supplies are fully covered in Switzerland or Germany?
+  - There is no WOC nurse within 200km of where I live — how do you manage remotely?
+  - The cost of pouches without insurance is insane — $400 a month just to function as a human being
+  - My hospital discharged me with a two-week supply and zero plan for how to get more
+- id: B4
+  short_name: body_image_acceptance
+  display_name: B4 · Image corporelle et acceptation de la stomie
+  hypothesis: This post is about body image, self-acceptance, or the emotional relationship to one's changed body and physical appearance with an ostomy.
+  keywords:
+  - body image
+  - accepting
+  - acceptance
+  - proud
+  - shame
+  - ashamed
+  - ugly
+  - beautiful
+  - mirror
+  - naked
+  - showing
+  - hiding
+  - pouch visible
+  - bikini
+  - swimsuit
+  - lingerie
+  - tattoo
+  - scar
+  - love my stoma
+  - hate my stoma
+  - feel normal
+  - grief
+  - identity
+  - before surgery
+  - who I am
+  - new normal
+  examples:
+  - Posted a photo today showing my stoma for the first time — terrified but also kind of proud
+  - I cannot look at myself in the mirror without feeling sick. Will this ever get better?
+  - Three years in and I finally wore a bikini on the beach. I cried.
+  - My stoma saved my life and I still hate it every single day — is that contradictory?
+  - I've been refusing to go swimming for two years because of my pouch. Finally did it yesterday.
+- id: B5
+  short_name: mental_health_emotional
+  display_name: B5 · Santé mentale et vécu émotionnel
+  hypothesis: This post is about mental health, psychological distress, anxiety, depression, fear, or emotional wellbeing related to living with an ostomy.
+  keywords:
+  - anxiety
+  - depressed
+  - depression
+  - struggling
+  - mental health
+  - afraid
+  - scared
+  - crying
+  - hopeful
+  - therapy
+  - therapist
+  - worth it
+  - regret
+  - ptsd
+  - trauma
+  - nightmares
+  - panic attack
+  - grief
+  - lost
+  - broken
+  - fighting
+  - stronger
+  - overwhelmed
+  - breakdown
+  - medication
+  - antidepressants
+  - counseling
+  - psychologist
+  examples:
+  - I've been crying every day since surgery. Three weeks in. Is this normal or should I see someone?
+  - The anxiety about leaking in public is so bad I've stopped leaving my house
+  - I know my stoma saved my life but I genuinely regret the surgery. Can I say that here?
+  - Had a panic attack in the grocery store today because I felt a leak starting
+  - Some days I feel genuinely proud of how I've coped with this. Most days I don't.
+- id: B6
+  short_name: relationships_sexuality
+  display_name: B6 · Relations et sexualité
+  hypothesis: This post is about romantic relationships, sexual intimacy, dating, or disclosing the ostomy to a partner or potential partner.
+  keywords:
+  - dating
+  - partner
+  - boyfriend
+  - girlfriend
+  - husband
+  - wife
+  - telling
+  - disclosure
+  - sex
+  - sexual
+  - intimacy
+  - intimate
+  - naked
+  - bedroom
+  - first time
+  - new relationship
+  - dating apps
+  - rejection
+  - rejected
+  - reaction
+  - supportive
+  - divorce
+  - relationship ended
+  - Tinder
+  - Bumble
+  - marriage
+  - honeymoon
+  - wedding
+  - love
+  examples:
+  - How do you tell a new partner about your ostomy? When is the right moment?
+  - My boyfriend of 2 years just told me my bag makes him uncomfortable. I'm devastated.
+  - Went on my first date since surgery last night. I didn't bring it up. Did I do the right thing?
+  - My wife has been amazing but I've completely lost interest in sex since surgery. Is this common?
+  - Tips for intimacy with a bag? Nervous about my first time with a new person
+- id: C7
+  short_name: social_stigma_participation
+  display_name: C7 · Stigmatisation et participation sociale
+  hypothesis: This post is about social stigma, embarrassment in public, fear of others noticing the ostomy, social isolation, or barriers to participating in social activities.
+  keywords:
+  - embarrassed
+  - embarrassing
+  - public
+  - smell
+  - odor
+  - noise
+  - gurgling
+  - sound
+  - avoid
+  - isolation
+  - hiding
+  - people staring
+  - public toilet
+  - bathroom
+  - restaurant
+  - event
+  - party
+  - airplane
+  - train
+  - discrimination
+  - judgment
+  - bullied
+  examples:
+  - My bag made the loudest noise in the middle of a work meeting. I wanted to disappear.
+  - The smell in public bathrooms is so bad I've started avoiding going out for more than 2 hours
+  - Someone on the train pointed at my bag outline under my shirt.
+  - Stopped going to church because I had a leak during a service once. A year ago. I still can't go back.
+  - Does anyone else just stay home instead of dealing with the anxiety of public bathrooms?
+- id: C8
+  short_name: return_to_work_activities
+  display_name: C8 · Retour au travail et activités quotidiennes
+  hypothesis: This post is about returning to work, resuming physical activities, sports, travel, or re-engaging with daily life and hobbies after ostomy surgery.
+  keywords:
+  - work
+  - job
+  - return to work
+  - back at work
+  - boss
+  - coworkers
+  - travel
+  - flying
+  - airport
+  - trip
+  - vacation
+  - holiday
+  - exercise
+  - sport
+  - swimming
+  - running
+  - gym
+  - hiking
+  - cycling
+  - yoga
+  - football
+  - CrossFit
+  - lifting
+  - hobbies
+  - normal life
+  - driving
+  - cooking
+  - gardening
+  examples:
+  - Going back to work next week after 8 weeks off — any advice for the first day?
+  - Does anyone run with an ostomy? I was a marathon runner before and I need to know if I can come back
+  - Flying for the first time with a stoma next month — what do I need to know about security?
+  - Anyone swim in the ocean or pools regularly? What's your pouching setup?
+  - Went camping for the first time since surgery. Figured out a whole system. Happy to share.
+- id: C9
+  short_name: hospital_to_home_transition
+  display_name: C9 · Transition hôpital-domicile et continuité des soins
+  hypothesis: This post is about the experience of being discharged from hospital, preparation for returning home, post-discharge follow-up care, or gaps in care coordination after ostomy surgery.
+  keywords:
+  - discharge
+  - discharged
+  - leaving hospital
+  - going home
+  - sent home
+  - home care
+  - community nurse
+  - district nurse
+  - follow-up
+  - nobody told me
+  - wasn't told
+  - no one explained
+  - no support
+  - first week home
+  - first days
+  - alone at home
+  - readmitted
+  - had to go back
+  - coordination
+  - GP didn't know
+  - stoma care at home
+  - after surgery
+  - post-op
+  - ERAS
+  - early discharge
+  examples:
+  - I was discharged after 4 days with barely any training. Did anyone else feel completely abandoned?
+  - Nobody told me that my output could be 2 litres a day. I nearly ended up back in hospital.
+  - The hospital gave me a two-week supply and a leaflet. That was it. No follow-up appointment.
+  - How do most people manage the first week at home? I feel like I'm completely on my own.
+  - Does anyone's care pathway actually feel continuous? Mine felt like a cliff after discharge.
+- id: D10
+  short_name: healthcare_experience
+  display_name: D10 · Expérience des soins et relation avec les professionnels
+  hypothesis: This post is about the quality of healthcare received, satisfaction or dissatisfaction with healthcare professionals, or gaps in information provided by the medical team.
+  keywords:
+  - doctor said
+  - nurse told me
+  - WOC nurse
+  - stoma nurse
+  - surgeon
+  - nobody explained
+  - wasn't told
+  - doctor doesn't know
+  - GP said
+  - bad advice
+  - wrong information
+  - great nurse
+  - terrible nurse
+  - hospital failed
+  - my consultant
+  - appointment
+  - helpline
+  - specialist
+  - gastroenterologist
+  - colorectal surgeon
+  - asking your doctor
+  - professional
+  - provider
+  examples:
+  - My surgeon never mentioned mental health support as part of recovery. Is that standard?
+  - The stoma nurse at my hospital is incredible — she answers texts at 9pm. Not all heroes wear capes.
+  - My GP told me to 'just use tape' to fix a leak. I don't think they understand how appliances work.
+  - Nobody — not the surgeon, not the nurses — ever told me that sex would be affected by my stoma
+  - Three appointments and my stoma nurse still hasn't addressed my skin issues. I feel dismissed.
+- id: D11
+  short_name: peer_support_community
+  display_name: D11 · Entraide communautaire et soutien par les pairs
+  hypothesis: This post is about peer support, sharing personal experience to help others, community solidarity, or the value of connecting with other ostomy patients.
+  keywords:
+  - you're not alone
+  - community
+  - support group
+  - this sub
+  - this subreddit
+  - thank you everyone
+  - UOAA
+  - ILCO
+  - advice for newbies
+  - just want to share
+  - wanted to give back
+  - for anyone who is new
+  - hope this helps
+  - solidarity
+  - someone who has been through this
+  - found this community
+  - milestone
+  - anniversary
+  - stomaversary
+  - celebrating
+  examples:
+  - One year ago I was in the ICU. Today I ran 5km. For anyone who is new — it gets better.
+  - This subreddit genuinely saved my life during my first three months. Thank you all.
+  - Just want to share some tips for new ostomates that I wish someone had told me
+  - For anyone who just got home from hospital and feels terrified — I see you. It does get easier.
+  - Nobody in my physical life understands this. You all do. That matters more than I can say.
+- id: CRISIS
+  short_name: crisis_suicidal_ideation
+  display_name: Crisis — suicidal ideation or acute distress
+  hypothesis: This post expresses suicidal ideation, wanting to die, not worth living, or an acute mental health crisis.
+  keywords:
+  - suicidal
+  - want to die
+  - not worth living
+  - end my life
+  - killing myself
+  - no reason to live
+  - self harm
+  - can't go on
+  examples:
+  - I don't want to be alive anymore since my surgery
+  - Has anyone felt like it's not worth living with a stoma?
+  - I'm struggling so much I don't know if I can keep going

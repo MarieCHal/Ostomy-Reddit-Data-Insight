@@ -18,7 +18,7 @@ Ce dépôt est organisé autour d’un pipeline léger type **ETL** : extraction
 | Élément | Rôle |
 |---------|------|
 | [`subreddit_extract/extract_subreddit.py`](subreddit_extract/extract_subreddit.py) | **Script** d’extraction autonome (`requests` seul) : logs terminal, sortie sous `results/`. Voir [`subreddit_extract/COMMANDES.md`](subreddit_extract/COMMANDES.md). |
-| [`subreddit_themes/`](subreddit_themes/COMMANDES.md) | **Thèmes (BART-MNLI)** : classification zero-shot sur un `posts.jsonl` déjà extrait, sorties `posts.themes.jsonl` + Excel allégé. Voir [`subreddit_themes/COMMANDES.md`](subreddit_themes/COMMANDES.md). |
+| [`subreddit_themes/`](subreddit_themes/COMMANDES.md) | **Thèmes (BART-MNLI)** : classification zero-shot **multi-label** (taxonomie MSC, 13 catégories, seuil 0.40) sur un `posts.jsonl` extrait → `posts.themes.jsonl` + Excel. Voir [`subreddit_themes/COMMANDES.md`](subreddit_themes/COMMANDES.md) et [`draft_guide_themes/`](draft_guide_themes/). |
 | [`subreddit_scorer/`](subreddit_scorer/COMMANDES.md) | **Sentiment (RoBERTa)** : polarité + index −1…+1 sur `posts.jsonl`, sorties `posts.sentiment.jsonl` + rapport Excel corpus. Voir [`subreddit_scorer/COMMANDES.md`](subreddit_scorer/COMMANDES.md). |
 | [`reddit_extract.py`](reddit_extract.py), [`ostomy_common.py`](ostomy_common.py) | Pipeline **historique** inchangé : extraction + analyse dans un même module partagé (charge spaCy, NLTK, VADER à l’import). |
 | [`ostomy_analyze.py`](ostomy_analyze.py) | Analyse sur JSONL déjà téléchargé (réseau non requis). |
@@ -58,7 +58,7 @@ python3 subreddit_themes/classify_subreddit_posts.py -i results/.../extract/post
 python3 subreddit_themes/report_workbook.py --run-dir results/.../limit_N
 ```
 
-Détails, options (`--device`, `--limit`, YAML des sujets en anglais) : [`subreddit_themes/COMMANDES.md`](subreddit_themes/COMMANDES.md).
+Détails, options (`--device`, `--threshold`, `--max-chars`, taxonomie YAML) : [`subreddit_themes/COMMANDES.md`](subreddit_themes/COMMANDES.md). Taxonomie de référence : [`draft_guide_themes/taxonomy_ostomy_roberta.md`](draft_guide_themes/taxonomy_ostomy_roberta.md).
 
 ## Étape 3 — sentiment (RoBERTa), hors pipeline historique
 

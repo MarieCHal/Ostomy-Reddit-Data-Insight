@@ -17,35 +17,29 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from jsonl_io import read_jsonl, write_json, write_jsonl
 from paths import prefixe_themes_sortie
+from themes_config import (
+    ThemeCategory,
+    ThemesConfig,
+    apply_exclusion_penalty,
+    apply_keyword_boost,
+    build_nli_hypothesis,
+    load_themes_config,
+)
 
 _DEFAULT_MODEL = "facebook/bart-large-mnli"
 _DIR = Path(__file__).resolve().parent
 
 
-def load_themes_config(path: Path) -> tuple[list[str], str]:
-    with open(path, encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
-    if not cfg or "labels" not in cfg:
-        raise ValueError(f"Invalid themes file (missing 'labels'): {path}")
-    labels = cfg["labels"]
-    if not isinstance(labels, list) or not all(isinstance(x, str) for x in labels):
-        raise ValueError("'labels' must be a list of strings")
-    template = str(
-        cfg.get("hypothesis_template") or "This post discusses {}."
-    )
-    return labels, template
-
-
-def post_text(row: dict[str, Any]) -> str:
+def post_text(row: dict[str, Any], max_chars: int) -> str:
     title = (row.get("title") or "").strip()
     body = (row.get("selftext") or "").strip()
     if title and body:
-        return f"{title}\n{body}"
-    return title or body
+        text = f"{title}\n{body}"
+    else:
+        text = title or body
+    return text[:max_chars]
 
 
 def resolve_device(name: str) -> int | str:
@@ -66,9 +60,65 @@ def resolve_device(name: str) -> int | str:
     raise ValueError(f"Unknown device: {name}")
 
 
+def classify_text(
+    classifier: Any,
+    text: str,
+    categories: list[ThemeCategory],
+    config: ThemesConfig,
+    threshold: float,
+) -> dict[str, Any]:
+    hypotheses = [build_nli_hypothesis(c, config) for c in categories]
+    hypothesis_to_short = dict(zip(hypotheses, [c.short_name for c in categories], strict=True))
+
+    result = classifier(
+        text,
+        candidate_labels=hypotheses,
+        hypothesis_template=config.hypothesis_template,
+        multi_label=True,
+        truncation=True,
+    )
+
+    theme_scores: dict[str, float] = {}
+    for label, score in zip(result["labels"], result["scores"], strict=True):
+        short_name = hypothesis_to_short[label]
+        theme_scores[short_name] = float(score)
+
+    theme_scores = apply_keyword_boost(text, theme_scores, categories, config)
+    theme_scores = apply_exclusion_penalty(text, theme_scores, categories, config)
+
+    theme_labels = [
+        name for name, score in theme_scores.items() if score >= threshold
+    ]
+    theme_labels.sort(key=lambda n: theme_scores[n], reverse=True)
+
+    if theme_labels:
+        top = theme_labels[0]
+        top_score = theme_scores[top]
+    else:
+        top = max(theme_scores, key=theme_scores.get)
+        top_score = theme_scores[top]
+
+    return {
+        "theme_scores": theme_scores,
+        "theme_labels": theme_labels,
+        "theme_label": top,
+        "theme_score": top_score,
+    }
+
+
+def empty_result() -> dict[str, Any]:
+    return {
+        "theme_label": None,
+        "theme_score": None,
+        "theme_labels": [],
+        "theme_scores": {},
+        "theme_classifier_note": "empty_text",
+    }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
-        description="Classify Reddit posts into fixed English themes (BART-MNLI zero-shot)."
+        description="Classify Reddit posts into fixed English themes (BART-MNLI zero-shot, multi-label)."
     )
     ap.add_argument(
         "-i",
@@ -81,7 +131,7 @@ def main() -> None:
         "--themes",
         type=Path,
         default=_DIR / "themes_ostomy.yaml",
-        help="YAML with 'labels' and optional 'hypothesis_template'",
+        help="YAML taxonomy (categories with hypothesis per label)",
     )
     ap.add_argument(
         "--model",
@@ -92,6 +142,18 @@ def main() -> None:
         "--device",
         default="auto",
         help="auto | cpu | cuda | mps",
+    )
+    ap.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        help="Score threshold per label (default: value from YAML, usually 0.40)",
+    )
+    ap.add_argument(
+        "--max-chars",
+        type=int,
+        default=None,
+        help="Max characters of title+body sent to the model (default: YAML, usually 1000)",
     )
     ap.add_argument(
         "--limit",
@@ -114,7 +176,9 @@ def main() -> None:
         print(f"Input not found: {inp}", file=sys.stderr)
         sys.exit(1)
 
-    labels, hypothesis_template = load_themes_config(args.themes)
+    config = load_themes_config(args.themes)
+    threshold = config.threshold if args.threshold is None else args.threshold
+    max_chars = config.max_text_chars if args.max_chars is None else args.max_chars
     device = resolve_device(args.device.lower())
 
     from transformers import pipeline
@@ -145,7 +209,7 @@ def main() -> None:
     n_empty = 0
 
     for i, row in enumerate(rows):
-        text = post_text(row)
+        text = post_text(row, max_chars)
         base = {
             "id": row.get("id"),
             "created_utc": row.get("created_utc"),
@@ -153,35 +217,15 @@ def main() -> None:
             "selftext": row.get("selftext") or "",
         }
 
-        if not text:
+        if not text.strip():
             n_empty += 1
-            enriched = {
-                **base,
-                "theme_label": None,
-                "theme_score": None,
-                "theme_scores": {},
-                "theme_classifier_note": "empty_text",
-            }
-            output_rows.append(enriched)
+            output_rows.append({**base, **empty_result()})
             continue
 
-        result = classifier(
-            text,
-            candidate_labels=labels,
-            hypothesis_template=hypothesis_template,
-            multi_label=False,
-            truncation=True,
+        classified = classify_text(
+            classifier, text, config.categories, config, threshold
         )
-        labs = result["labels"]
-        scores = result["scores"]
-        theme_scores = dict(zip(labs, scores))
-        enriched = {
-            **base,
-            "theme_label": labs[0],
-            "theme_score": float(scores[0]),
-            "theme_scores": theme_scores,
-        }
-        output_rows.append(enriched)
+        output_rows.append({**base, **classified})
 
         if (i + 1) % 10 == 0 or i == len(rows) - 1:
             print(f"  classified {i + 1}/{len(rows)}", flush=True)
@@ -189,14 +233,28 @@ def main() -> None:
     write_jsonl(out_jsonl, output_rows)
 
     meta = {
-        "version": 1,
+        "version": config.version,
+        "classification_mode": config.classification_mode,
+        "threshold": threshold,
+        "max_text_chars": max_chars,
         "model": args.model,
         "device_requested": args.device,
         "device_resolved": str(device),
         "themes_file": str(args.themes.resolve()),
-        "hypothesis_template": hypothesis_template,
-        "labels": labels,
-        "n_labels": len(labels),
+        "enrich_hypothesis_with_keywords": config.enrich_hypothesis_with_keywords,
+        "keyword_boost_per_match": config.keyword_boost_per_match,
+        "keyword_boost_cap": config.keyword_boost_cap,
+        "exclusion_penalty": config.exclusion_penalty,
+        "hypothesis_template": config.hypothesis_template,
+        "categories": [
+            {
+                "id": c.id,
+                "short_name": c.short_name,
+                "display_name": c.display_name,
+            }
+            for c in config.categories
+        ],
+        "n_labels": len(config.categories),
         "input_jsonl": str(inp.resolve()),
         "output_jsonl": str(out_jsonl.resolve()),
         "n_posts": len(rows),

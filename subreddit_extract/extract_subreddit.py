@@ -3,8 +3,12 @@
 Script autonome : télécharge les posts d'un subreddit (API JSON publique Reddit)
 et écrit posts.jsonl + posts.meta.json.
 
-Ce n'est pas un « package » installable : un seul fichier à lancer, par ex. depuis
-la racine du dépôt :
+Pipeline réseau (voir extraire_posts_periode) :
+  1. /r/<sub>/new.json   — flux récent → ancien, filtre par created_utc
+  2. /r/<sub>/search.json — optionnel ; plusieurs paramètres q= pour élargir le corpus
+     (enregistrés dans meta sous queries_search_utilisees)
+
+Un seul fichier à lancer depuis la racine du dépôt :
 
   python3 subreddit_extract/extract_subreddit.py --help
   python3 subreddit_extract/extract_subreddit.py -s ostomy --start 2026-01-01 --end 2026-05-14 --limit 500
@@ -24,7 +28,8 @@ from pathlib import Path
 from typing import Any, Sequence
 
 # ---------------------------------------------------------------------------
-# Paramètres HTTP (alignés sur l'ancien flux ostomy_common)
+# Paramètres HTTP (alignés sur l'ancien flux ostomy_common).
+# LISTE_QUERIES_* : paramètres « q= » pour la phase /search (voir extraire_posts_periode).
 # ---------------------------------------------------------------------------
 SLEEP_ENTRE_REQUETES_S: float = 2.0
 TIMEOUT_S: int = 45
@@ -50,6 +55,12 @@ log = logging.getLogger(__name__)
 
 # --- HTTP -----------------------------------------------------------------
 def requete_reddit(url: str, params: dict[str, str | int | None]) -> Any:
+    """
+    GET vers un endpoint Reddit *.json (public, sans clé API).
+
+    En-tête User-Agent obligatoire pour limiter les refus côté Reddit.
+    En cas de 429 (trop de requêtes), attend puis réessaie jusqu'à MAX_TENTATIVES_HTTP.
+    """
     import requests
 
     headers = {"User-Agent": USER_AGENT}
@@ -73,6 +84,7 @@ def requete_reddit(url: str, params: dict[str, str | int | None]) -> Any:
 
 
 def payload_children(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extrait la liste `data.children` d'une réponse JSON Reddit (/new ou /search)."""
     data = payload.get("data") or {}
     return data.get("children") or []
 
@@ -85,6 +97,11 @@ def dossier_resultat_defaut(
     limit: int,
     racine_results: str = "results",
 ) -> Path:
+    """
+    Dossier de run par défaut : results/<sub>/<debut>_<fin>[/limit_N].
+
+    Le sous-dossier extract/ et le préfixe posts sont ajoutés par prefixe_posts().
+    """
     base = Path(racine_results) / subreddit.lower() / f"{date_debut}_{date_fin}"
     if limit and limit > 0:
         base = base / f"limit_{limit}"
@@ -92,13 +109,22 @@ def dossier_resultat_defaut(
 
 
 def prefixe_posts(dossier: Path) -> Path:
-    """Préfixe sans extension : …/<run>/extract/posts → posts.jsonl + posts.meta.json."""
+    """
+    Chemin de base des fichiers bruts (sans extension).
+
+    Produit …/<run>/extract/posts.jsonl et posts.meta.json via chemins_bruts().
+    """
     extract_dir = dossier / "extract"
     extract_dir.mkdir(parents=True, exist_ok=True)
     return extract_dir / "posts"
 
 
 def chemins_bruts(chemin_base: str | Path) -> tuple[Path, Path]:
+    """
+    Déduit les chemins JSONL et meta à partir d'un préfixe (avec ou sans .jsonl).
+
+    Ex. chemin_base=…/posts → (…/posts.jsonl, …/posts.meta.json).
+    """
     p = Path(chemin_base)
     jsonl = p if p.suffix == ".jsonl" else p.with_suffix(".jsonl")
     meta = jsonl.parent / f"{jsonl.stem}.meta.json"
@@ -110,6 +136,12 @@ def sauvegarder_posts_bruts(
     entrees: list[dict[str, Any]],
     meta: dict[str, Any],
 ) -> tuple[str, str]:
+    """
+    Écrit le corpus brut : une ligne JSON par post + fichier .meta.json (paramètres du run).
+
+    Champs JSONL : id, created_utc, title, selftext (soumissions uniquement, pas les commentaires).
+    Retourne (chemin_jsonl, chemin_meta) en chaînes.
+    """
     jsonl, metaf = chemins_bruts(chemin_base)
     jsonl.parent.mkdir(parents=True, exist_ok=True)
     with open(jsonl, "w", encoding="utf-8") as f:
@@ -128,6 +160,12 @@ def sauvegarder_posts_bruts(
 
 # --- Extraction -------------------------------------------------------------
 def bornes_dates_utc_iso(date_debut: str, date_fin: str) -> tuple[float, float, str]:
+    """
+    Convertit --start / --end (YYYY-MM-DD) en timestamps Unix UTC inclusifs.
+
+    Début : 00:00:00 du jour de début. Fin : 23:59:59 du jour de fin.
+    Retourne (ts_debut, ts_fin, label_plage) pour filtrage et meta.
+    """
     d0 = datetime.strptime(date_debut, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     d1 = datetime.strptime(date_fin, "%Y-%m-%d").replace(
         hour=23, minute=59, second=59, tzinfo=timezone.utc
@@ -139,6 +177,11 @@ def bornes_dates_utc_iso(date_debut: str, date_fin: str) -> tuple[float, float, 
 
 
 def entree_de_t3(d: dict[str, Any]) -> dict[str, Any] | None:
+    """
+    Normalise un objet `data` Reddit de type t3 (soumission / post du fil).
+
+    Retourne None si id ou created_utc manquants. Les commentaires (t1) sont ignorés ailleurs.
+    """
     pid = d.get("id")
     if not pid:
         return None
@@ -157,8 +200,14 @@ def entree_de_t3(d: dict[str, Any]) -> dict[str, Any] | None:
 
 @dataclass
 class EtatPlafond:
+    """
+    Posts uniques collectés (clé = id Reddit), avec plafond optionnel (--limit).
+
+    Utilisé pendant /new et /search pour dédupliquer les mêmes fils renvoyés par plusieurs requêtes.
+    """
+
     by_id: dict[str, dict[str, Any]]
-    limite: int
+    limite: int  # 0 = pas de plafond
 
     def ajouter_si_periode(
         self,
@@ -166,6 +215,12 @@ class EtatPlafond:
         ts_deb: float,
         ts_fin: float,
     ) -> bool:
+        """
+        Ajoute le post s'il est dans [ts_deb, ts_fin] et sous la limite.
+
+        Retourne False si le plafond est atteint (signal d'arrêt pour la boucle d'extraction).
+        Retourne True si le post est hors période ou ignoré (on continue à paginer).
+        """
         cu = d.get("created_utc")
         if cu is None:
             return True
@@ -190,6 +245,18 @@ def extraire_posts_periode(
     elargissement_search: bool,
     sleep_s: float,
 ) -> tuple[list[dict[str, Any]], int, int, str]:
+    """
+    Collecte les soumissions (t3) d'un subreddit sur une fenêtre temporelle UTC.
+
+    Phase 1 — /new.json : flux antichronologique, pagination `after`, filtre created_utc.
+    Phase 2 — /search.json (si elargissement_search) : pour chaque chaîne de
+    liste_queries_recherche (ex. a…z, ostomy…), même filtre date + dédup par id.
+    Les requêtes search ne filtrent pas le texte des posts : elles servent à découvrir
+    plus d'URL de posts que /new seul n'atteint pas toujours.
+
+    Retourne (posts_triés_récents_d'abord, n_requêtes_http, n_posts, note_run).
+    note_run documente pourquoi l'extraction s'est arrêtée (plafond, liste vide, etc.).
+    """
     etat = EtatPlafond(by_id={}, limite=limite_posts)
     n_requetes = 0
     notes: list[str] = []
@@ -199,6 +266,7 @@ def extraire_posts_periode(
     tete_new = f"https://www.reddit.com/r/{sub}/new.json"
     params_new: dict[str, str | int] = {"limit": 100, "raw_json": 1}
 
+    # --- Phase 1 : /new (posts récents → plus anciens) -----------------------
     log.info("Phase /new — r/%s (fenêtre UTC [%.0f, %.0f])", sub, ts_deb, ts_fin)
     after: str | None = None
     premiere_new = True
@@ -246,6 +314,7 @@ def extraire_posts_periode(
             "oui" if data.get("after") else "non",
         )
 
+        # Arrêt anticipé : la page la plus ancienne est déjà avant le début de la fenêtre
         last = children[-1]
         if last.get("kind") == "t3" and (last.get("data") or {}).get("created_utc") is not None:
             plus_ancien = float((last.get("data") or {})["created_utc"])
@@ -261,6 +330,7 @@ def extraire_posts_periode(
     notes.append(f"new:{note_new},n_dans_fenetre={len(etat.by_id)}")
     log.info("Fin phase /new — %s", notes[-1])
 
+    # --- Phase 2 : /search (élargissement ; liste enregistrée dans meta queries_search_utilisees)
     if elargissement_search and not plafond_stop:
         tete_search = f"https://www.reddit.com/r/{sub}/search.json"
         n_avant = len(etat.by_id)
@@ -285,9 +355,10 @@ def extraire_posts_periode(
                 premiere_s = False
                 page_s += 1
                 n_requetes += 1
+                # q= requ : paramètre de recherche Reddit (pas un filtre sur le texte final)
                 p_s: dict[str, str | int | None] = {
                     "q": requ,
-                    "restrict_sr": 1,
+                    "restrict_sr": 1,  # limiter la recherche à ce subreddit
                     "sort": "new",
                     "limit": 100,
                     "raw_json": 1,
@@ -347,6 +418,12 @@ def extraire_vers_fichiers_bruts(
     elargissement_search: bool,
     sleep_s: float,
 ) -> tuple[str, str, int, int, str]:
+    """
+    Orchestre l'extraction réseau puis l'écriture posts.jsonl + posts.meta.json.
+
+    Le meta inclut la période, le code d'arrêt, et queries_search_utilisees si /search a tourné.
+    Retourne (chemin_jsonl, chemin_meta, n_requêtes_http, n_posts, note_run).
+    """
     ts_deb, ts_fin, label_plage = bornes_dates_utc_iso(date_debut, date_fin)
     entrees, n_req, n_posts, run_note = extraire_posts_periode(
         subreddit=subreddit,
@@ -393,6 +470,7 @@ Les dates sont en UTC (début 00:00:00, fin 23:59:59 du jour indiqué).
 
 
 def configurer_logging(verbose: bool) -> None:
+    """Active les logs horodatés sur stdout (INFO par défaut, DEBUG avec -v)."""
     niveau = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
         level=niveau,
@@ -404,6 +482,11 @@ def configurer_logging(verbose: bool) -> None:
 
 
 def resoudre_liste_queries(subreddit: str, mode: str) -> list[str]:
+    """
+    Choisit les valeurs `q=` pour la phase /search (--search-queries).
+
+    auto : liste « domaine » pour r/ostomy, sinon alphabet a–z seulement.
+    """
     sub = subreddit.strip().removeprefix("r/").strip().lower()
     if mode == "ostomy":
         return list(LISTE_QUERIES_RECHERCHE_OSTOMY)
@@ -415,6 +498,7 @@ def resoudre_liste_queries(subreddit: str, mode: str) -> list[str]:
 
 
 def construire_parser() -> argparse.ArgumentParser:
+    """Définit la CLI reddit-subreddit-extract (voir --help et EPILOG)."""
     p = argparse.ArgumentParser(
         prog="reddit-subreddit-extract",
         description=(
@@ -460,6 +544,7 @@ def construire_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Point d'entrée : parse les arguments, lance l'extraction, affiche le résumé."""
     args = construire_parser().parse_args(list(argv) if argv is not None else None)
     configurer_logging(args.verbose)
 

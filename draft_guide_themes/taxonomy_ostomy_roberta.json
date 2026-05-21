@@ -1,0 +1,138 @@
+{
+  "metadata": {
+    "project": "Groupe 40 — Enjeux du retour à la communauté pour les personnes stomisées en Suisse",
+    "module": "B3.6 MSC — Immersion communautaire, UNIL 2025-2026",
+    "data_source": "Subreddit r/ostomy (Reddit)",
+    "classification_type": "multi-label",
+    "language": "English",
+    "note_scope": "Digestive ostomies only (colostomy, ileostomy). Apply relevance filter (cat. F0) before all other categories.",
+    "note_threshold": "Zero-shot: use score >= 0.40 per label. Fine-tuned: use score >= 0.50. A post can receive multiple labels.",
+    "note_hypothesis": "For zero-shot NLI models (e.g. facebook/bart-large-mnli), pass each category's hypothesis as the candidate label with hypothesis_template='{}'. Set multi_label=True.",
+    "created": "2026-05-20",
+    "implementation": "Operational YAML: subreddit_themes/themes_ostomy.yaml (includes CRISIS category for V0 pipeline)"
+  },
+  "categories": [
+    {
+      "id": "F0",
+      "short_name": "digestive_relevance",
+      "display_name": "Relevance filter — Digestive ostomy",
+      "dimension": "FILTER",
+      "definition": "The post is about a digestive ostomy (colostomy, ileostomy, or unspecified intestinal stoma), not a urinary ostomy, tracheostomy, or unrelated topic.",
+      "hypothesis_template": "This post is about living with a colostomy, ileostomy, or intestinal stoma.",
+      "classification_instruction": "Run this filter FIRST. Posts scoring below threshold are excluded from all further classification. Do NOT apply to posts about urostomy, ileal conduit, tracheostomy, or commercial ads."
+    },
+    {
+      "id": "A1",
+      "short_name": "technical_stoma_care",
+      "display_name": "A1 · Soins et gestion technique de la stomie",
+      "dimension": "A — Besoins pratiques et techniques",
+      "definition": "The post is about the technical and physical management of the stoma appliance, including bag changes, leaks, skin care, product selection, stoma complications, or hands-on self-care routines.",
+      "hypothesis_template": "This post is about the physical management of the stoma appliance, skin care around the stoma, or technical problems like leaks and bag changes."
+    },
+    {
+      "id": "A2",
+      "short_name": "diet_and_output",
+      "display_name": "A2 · Alimentation et gestion du transit",
+      "dimension": "A — Besoins pratiques et techniques",
+      "definition": "The post is about diet, nutrition, food restrictions, managing stoma output volume and consistency, dehydration, blockages, or the impact of eating on stoma function.",
+      "hypothesis_template": "This post is about diet, nutrition, food choices, or managing stoma output volume and consistency."
+    },
+    {
+      "id": "A3",
+      "short_name": "access_to_resources",
+      "display_name": "A3 · Accès aux ressources et matériel",
+      "dimension": "A — Besoins pratiques et techniques",
+      "definition": "The post is about access to stoma supplies, healthcare coverage, insurance reimbursement, cost of products, or difficulties accessing specialist care such as a stoma nurse or WOC nurse.",
+      "hypothesis_template": "This post is about access to stoma supplies, insurance coverage, reimbursement costs, or difficulties accessing specialist stoma care."
+    },
+    {
+      "id": "B4",
+      "short_name": "body_image_acceptance",
+      "display_name": "B4 · Image corporelle et acceptation de la stomie",
+      "dimension": "B — Vécu psychosocial et identitaire",
+      "definition": "The post is about body image, the process of accepting or grieving a changed body, shame or pride related to the stoma, identity, or the emotional relationship to one's physical appearance with an ostomy.",
+      "hypothesis_template": "This post is about body image, self-acceptance, or the emotional relationship to one's changed body and physical appearance with an ostomy."
+    },
+    {
+      "id": "B5",
+      "short_name": "mental_health_emotional",
+      "display_name": "B5 · Santé mentale et vécu émotionnel",
+      "dimension": "B — Vécu psychosocial et identitaire",
+      "definition": "The post expresses or discusses psychological distress, mental health struggles, anxiety, depression, fear, grief, or conversely, hope, resilience, and emotional recovery related to living with a stoma.",
+      "hypothesis_template": "This post is about mental health, psychological distress, anxiety, depression, fear, or emotional wellbeing related to living with an ostomy."
+    },
+    {
+      "id": "B6",
+      "short_name": "relationships_sexuality",
+      "display_name": "B6 · Relations et sexualité",
+      "dimension": "B — Vécu psychosocial et identitaire",
+      "definition": "The post is about romantic relationships, sexual intimacy, disclosure of the ostomy to a partner or new interest, reactions from loved ones, dating with a stoma, or changes in intimate life.",
+      "hypothesis_template": "This post is about romantic relationships, sexual intimacy, dating, or disclosing the ostomy to a partner or potential partner."
+    },
+    {
+      "id": "C7",
+      "short_name": "social_stigma_participation",
+      "display_name": "C7 · Stigmatisation et participation sociale",
+      "dimension": "C — Réinsertion sociale et vie quotidienne",
+      "definition": "The post is about social stigma, embarrassment in public situations, fear of others noticing the ostomy through noise or smell, social withdrawal, discrimination, or barriers to participating in social life.",
+      "hypothesis_template": "This post is about social stigma, embarrassment in public, fear of others noticing the ostomy, social isolation, or barriers to participating in social activities."
+    },
+    {
+      "id": "C8",
+      "short_name": "return_to_work_activities",
+      "display_name": "C8 · Retour au travail et activités quotidiennes",
+      "dimension": "C — Réinsertion sociale et vie quotidienne",
+      "definition": "The post is about returning to work, resuming professional activities, traveling, practicing sports or physical activity, or re-engaging with hobbies and daily life activities after ostomy surgery.",
+      "hypothesis_template": "This post is about returning to work, resuming physical activities, sports, travel, or re-engaging with daily life and hobbies after ostomy surgery."
+    },
+    {
+      "id": "C9",
+      "short_name": "hospital_to_home_transition",
+      "display_name": "C9 · Transition hôpital-domicile et continuité des soins",
+      "dimension": "C — Réinsertion sociale et vie quotidienne",
+      "definition": "The post is about the experience of hospital discharge, the adequacy or inadequacy of preparation before leaving hospital, post-discharge follow-up, home care services, or failures in care coordination between the hospital and community-based care.",
+      "hypothesis_template": "This post is about the experience of being discharged from hospital, preparation for returning home, post-discharge follow-up care, or gaps in care coordination after ostomy surgery."
+    },
+    {
+      "id": "D10",
+      "short_name": "healthcare_experience",
+      "display_name": "D10 · Expérience des soins et relation avec les professionnels",
+      "dimension": "D — Interactions avec le système de soins",
+      "definition": "The post expresses satisfaction or dissatisfaction with healthcare professionals, describes a gap in information provided by care teams, evaluates the quality of stoma nurse care, or reflects on the patient-provider relationship.",
+      "hypothesis_template": "This post is about the quality of healthcare received, satisfaction or dissatisfaction with healthcare professionals, or gaps in information provided by the medical team."
+    },
+    {
+      "id": "D11",
+      "short_name": "peer_support_community",
+      "display_name": "D11 · Entraide communautaire et soutien par les pairs",
+      "dimension": "D — Interactions avec le système de soins",
+      "definition": "The post is primarily about peer support, sharing lived experience to help others, expressing gratitude for community support, mentioning patient associations, or highlighting the role of the online community in filling gaps left by formal healthcare.",
+      "hypothesis_template": "This post is about peer support, sharing personal experience to help others, community solidarity, or the value of connecting with other ostomy patients."
+    },
+    {
+      "id": "CRISIS",
+      "short_name": "crisis_suicidal_ideation",
+      "display_name": "Crisis — suicidal ideation or acute distress",
+      "dimension": "FILTER",
+      "definition": "The post expresses active suicidal ideation or acute mental health crisis language. Flag for manual review; exclude from quantitative analyses unless ethically validated.",
+      "hypothesis_template": "This post expresses suicidal ideation, wanting to die, not worth living, or an acute mental health crisis."
+    }
+  ],
+  "implementation_notes": {
+    "pipeline_order": [
+      "Step 1: Classify all posts with F0 + A1–D11 + CRISIS (multi_label=True).",
+      "Step 2: Apply threshold 0.40 per label.",
+      "Step 3: In Excel, filter label_digestive_relevance=1 for digestive corpus.",
+      "Step 4: Exclude label_crisis_suicidal_ideation=1 from quantitative stats unless reviewed.",
+      "Step 5: Manually validate a random sample of ~50 posts per category."
+    ],
+    "priority_categories_for_research": ["C9", "D10", "B5", "A3"],
+    "recommended_model_zero_shot": "facebook/bart-large-mnli",
+    "recommended_model_finetuning": "roberta-base or roberta-large (HuggingFace Trainer, multi-label head) — hors scope V0",
+    "max_text_chars": 1000,
+    "keyword_supplement_for_C9": [
+      "discharge", "going home", "nobody told me", "community nurse",
+      "first week home", "sent home", "abandoned", "readmitted", "alone at home"
+    ]
+  }
+}
