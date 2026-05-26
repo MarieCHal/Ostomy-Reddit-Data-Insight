@@ -30,7 +30,11 @@ class ThemesConfig:
     classification_mode: str
     version: int
     enrich_hypothesis_with_keywords: bool = True
+    enrich_hypothesis_with_definition: bool = False
+    enrich_hypothesis_with_examples: bool = False
     max_keywords_in_hypothesis: int = 10
+    max_examples_in_hypothesis: int = 5
+    max_hypothesis_chars: int = 600
     keyword_boost_per_match: float = 0.03
     keyword_boost_cap: float = 0.12
     exclusion_penalty: float = 0.35
@@ -46,20 +50,30 @@ def _str_list(value: Any) -> tuple[str, ...]:
     return tuple(str(x).strip() for x in value if str(x).strip())
 
 
+def _truncate_hypothesis(text: str, max_len: int) -> str:
+    if len(text) <= max_len:
+        return text
+    trimmed = text[: max_len - 3].rsplit(" ", 1)[0]
+    return trimmed + "..."
+
+
 def build_nli_hypothesis(category: ThemeCategory, config: ThemesConfig) -> str:
-    """Hypothesis string sent to BART-MNLI (optionally enriched with keywords)."""
-    base = category.hypothesis.strip()
-    if not config.enrich_hypothesis_with_keywords or not category.keywords:
-        return base
-    kws = category.keywords[: config.max_keywords_in_hypothesis]
-    suffix = " Related topics: " + ", ".join(kws) + "."
-    # Keep within a reasonable length for the tokenizer (~512 tokens total with post).
-    max_len = 480
-    if len(base) + len(suffix) > max_len:
-        suffix = " Related topics: " + ", ".join(kws[:6]) + "."
-    if len(base) + len(suffix) > max_len:
-        return base[:max_len]
-    return base + suffix
+    """Hypothesis string sent to BART-MNLI (enriched per config flags)."""
+    parts = [category.hypothesis.strip()]
+
+    if config.enrich_hypothesis_with_definition and category.definition:
+        parts.append(category.definition.strip())
+
+    if config.enrich_hypothesis_with_examples and category.examples:
+        picked = category.examples[: config.max_examples_in_hypothesis]
+        quoted = "; ".join(f'"{ex}"' for ex in picked)
+        parts.append(f"Example posts: {quoted}.")
+
+    if config.enrich_hypothesis_with_keywords and category.keywords:
+        kws = category.keywords[: config.max_keywords_in_hypothesis]
+        parts.append("Related topics: " + ", ".join(kws) + ".")
+
+    return _truncate_hypothesis(" ".join(parts), config.max_hypothesis_chars)
 
 
 def keyword_matches(text: str, keywords: tuple[str, ...]) -> int:
@@ -158,7 +172,15 @@ def load_themes_config(path: Path) -> ThemesConfig:
         classification_mode=classification_mode,
         version=version,
         enrich_hypothesis_with_keywords=bool(cfg.get("enrich_hypothesis_with_keywords", True)),
+        enrich_hypothesis_with_definition=bool(
+            cfg.get("enrich_hypothesis_with_definition", False)
+        ),
+        enrich_hypothesis_with_examples=bool(
+            cfg.get("enrich_hypothesis_with_examples", False)
+        ),
         max_keywords_in_hypothesis=int(cfg.get("max_keywords_in_hypothesis", 10)),
+        max_examples_in_hypothesis=int(cfg.get("max_examples_in_hypothesis", 5)),
+        max_hypothesis_chars=int(cfg.get("max_hypothesis_chars", 600)),
         keyword_boost_per_match=float(cfg.get("keyword_boost_per_match", 0.03)),
         keyword_boost_cap=float(cfg.get("keyword_boost_cap", 0.12)),
         exclusion_penalty=float(cfg.get("exclusion_penalty", 0.35)),

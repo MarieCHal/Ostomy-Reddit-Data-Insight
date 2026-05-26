@@ -62,3 +62,7 @@ A titre infomatif:
 Next step:
 - check les x premiers commentaire du doc, ajoutes un column commentaires, et attribue toi même de thèmes ainsi que score de sentiment. 
 - fait moi un retour sur la performance du theme 'digestive relevance', tu peux flitrer en haut pour voir que les 0 (pas dans le theme) ou que les 1 (dans le theme)
+
+
+- enlever les posts qui sont de plus de 1000 charactères
+- gérer les posts avec photos

@@ -1,0 +1,173 @@
+# Taxonomie r/ostomy — 4 thèmes généraux (test BART-MNLI).
+# Regroupe les sous-catégories MSC détaillées (A1–D11) en 4 blocs.
+#
+# Les examples sont injectés dans l'hypothèse NLI (enrich_hypothesis_with_examples).
+# Voir themes_config.build_nli_hypothesis.
+
+version: 1
+classification_mode: multi_label
+threshold: 0.4
+max_text_chars: 1000
+hypothesis_template: '{}'
+enrich_hypothesis_with_definition: true
+enrich_hypothesis_with_examples: true
+max_examples_in_hypothesis: 6
+max_hypothesis_chars: 700
+enrich_hypothesis_with_keywords: true
+max_keywords_in_hypothesis: 12
+keyword_boost_per_match: 0.03
+keyword_boost_cap: 0.12
+exclusion_penalty: 0.0
+categories:
+- id: A
+  short_name: practical_technical_needs
+  display_name: A · Practical and technical needs
+  hypothesis: This post is about practical or technical aspects of living with an ostomy.
+  definition: >-
+    The post covers stoma appliance care, leaks, skin care, product selection,
+    diet and output management, blockages, dehydration, or access to supplies,
+    insurance coverage, and specialist stoma care resources.
+  keywords:
+  - leaking
+  - wafer
+  - flange
+  - barrier
+  - bag change
+  - appliance
+  - peristomal skin
+  - pouch
+  - diet
+  - food
+  - blockage
+  - output
+  - dehydration
+  - insurance
+  - coverage
+  - cost
+  - supply
+  - WOC nurse
+  - stoma nurse
+  examples:
+  - My wafer keeps failing after only 2 days, any tips to make it last longer?
+  - Peristomal skin is bright red and burning, tried everything and nothing helps
+  - What foods should I absolutely avoid with an ileostomy? Just got home from hospital
+  - I got a partial blockage from eating mushrooms — 12 hours of hell, never again
+  - My output is so high I'm getting dehydrated every day despite drinking 3 litres
+  - My insurance denied coverage for the convex pouches my stoma nurse prescribed — how do I appeal?
+  - The cost of pouches without insurance is insane — $400 a month just to function as a human being
+- id: B
+  short_name: psychosocial_experience
+  display_name: B · Psychosocial experience
+  hypothesis: This post is about the emotional, psychological, or relational experience of living with an ostomy.
+  definition: >-
+    The post covers body image and self-acceptance, mental health and psychological
+    distress, anxiety, depression, grief, hope, or romantic relationships, sexual
+    intimacy, dating, and disclosing the ostomy to a partner.
+  keywords:
+  - body image
+  - acceptance
+  - shame
+  - mirror
+  - anxiety
+  - depressed
+  - depression
+  - mental health
+  - crying
+  - therapy
+  - regret
+  - panic attack
+  - dating
+  - partner
+  - boyfriend
+  - girlfriend
+  - husband
+  - wife
+  - sex
+  - intimacy
+  - disclosure
+  - rejection
+  examples:
+  - I've been crying every day since surgery. Three weeks in. Is this normal or should I see someone?
+  - The anxiety about leaking in public is so bad I've stopped leaving my house
+  - I cannot look at myself in the mirror without feeling sick. Will this ever get better?
+  - My stoma saved my life and I still hate it every single day — is that contradictory?
+  - How do you tell a new partner about your ostomy? When is the right moment?
+  - My wife has been amazing but I've completely lost interest in sex since surgery. Is this common?
+  - Had a panic attack in the grocery store today because I felt a leak starting
+- id: C
+  short_name: social_reintegration_daily_life
+  display_name: C · Social reintegration and daily life
+  hypothesis: This post is about returning to social life, work, activities, or daily routines with an ostomy.
+  definition: >-
+    The post covers social stigma, embarrassment in public, fear of others noticing
+    the ostomy, social isolation, returning to work, sports, travel, hobbies, or
+    re-engaging with everyday life after surgery.
+  keywords:
+  - embarrassed
+  - public
+  - smell
+  - odor
+  - noise
+  - isolation
+  - hiding
+  - work
+  - return to work
+  - travel
+  - flying
+  - airport
+  - exercise
+  - sport
+  - swimming
+  - running
+  - gym
+  - vacation
+  - normal life
+  - restaurant
+  - party
+  examples:
+  - Going back to work next week after 8 weeks off — any advice for the first day?
+  - Does anyone run with an ostomy? I was a marathon runner before and I need to know if I can come back
+  - My bag made the loudest noise in the middle of a work meeting. I wanted to disappear.
+  - Does anyone else just stay home instead of dealing with the anxiety of public bathrooms?
+  - Flying for the first time with a stoma next month — what do I need to know about security?
+  - Went camping for the first time since surgery. Figured out a whole system. Happy to share.
+  - Three years in and I finally wore a bikini on the beach. I cried.
+- id: D
+  short_name: healthcare_system_interactions
+  display_name: D · Interactions with the healthcare system
+  hypothesis: This post is about interactions with healthcare providers, hospital care, or peer support within the healthcare journey.
+  definition: >-
+    The post covers hospital discharge and transition home, follow-up care, gaps in
+    care coordination, satisfaction or dissatisfaction with healthcare professionals,
+    information provided by the medical team, or peer support and community solidarity
+    among ostomy patients.
+  keywords:
+  - discharge
+  - discharged
+  - leaving hospital
+  - going home
+  - follow-up
+  - nobody told me
+  - wasn't told
+  - no one explained
+  - doctor said
+  - surgeon
+  - stoma nurse
+  - WOC nurse
+  - GP said
+  - hospital failed
+  - appointment
+  - specialist
+  - community
+  - support group
+  - this subreddit
+  - advice for newbies
+  - hope this helps
+  examples:
+  - I was discharged after 4 days with barely any training. Did anyone else feel completely abandoned?
+  - Nobody told me that my output could be 2 litres a day. I nearly ended up back in hospital.
+  - My GP told me to 'just use tape' to fix a leak. I don't think they understand how appliances work.
+  - The stoma nurse at my hospital is incredible — she answers texts at 9pm. Not all heroes wear capes.
+  - This subreddit genuinely saved my life during my first three months. Thank you all.
+  - Just want to share some tips for new ostomates that I wish someone had told me
+  - For anyone who just got home from hospital and feels terrified — I see you. It does get easier.
