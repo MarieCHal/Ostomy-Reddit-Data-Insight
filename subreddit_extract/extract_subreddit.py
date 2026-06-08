@@ -45,10 +45,13 @@ USER_AGENT: str = (
 LISTE_QUERIES_RECHERCHE_OSTOMY: list[str] = list(string.ascii_lowercase) + [
     "ostomy",
     "stoma",
-    "ileostomy",
-    "colostomy",
 ]
 LISTE_QUERIES_RECHERCHE_GENERIQUE: list[str] = list(string.ascii_lowercase)
+
+ARCTIC_SHIFT_POSTS_URL: str = (
+    "https://arctic-shift.photon-reddit.com/api/posts/search"
+)
+ARCTIC_SHIFT_PAGE_LIMIT: int = 100
 
 log = logging.getLogger(__name__)
 
@@ -81,6 +84,56 @@ def requete_reddit(url: str, params: dict[str, str | int | None]) -> Any:
         return r
     r.raise_for_status()
     raise RuntimeError("requête Reddit: échec inattendu")
+
+
+def requete_arctic_shift(
+    session: Any,
+    params: dict[str, str | int | None],
+) -> Any:
+    """
+    GET vers l'API Arctic Shift (archive Reddit publique).
+
+    Même schéma de posts que l'API Reddit ; utile quand reddit.com renvoie HTTP 403.
+    """
+    import requests
+
+    headers = {"User-Agent": USER_AGENT}
+    for tentative in range(MAX_TENTATIVES_HTTP):
+        log.debug("GET %s params=%s", ARCTIC_SHIFT_POSTS_URL, params)
+        try:
+            r = session.get(
+                ARCTIC_SHIFT_POSTS_URL,
+                params=params,
+                headers=headers,
+                timeout=TIMEOUT_S,
+            )
+        except (
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+        ) as exc:
+            attente = ATTENTE_S_SUR_429 + 15.0 * tentative
+            log.warning(
+                "Arctic Shift erreur réseau (%s) — pause %.0fs (%s/%s)…",
+                type(exc).__name__,
+                attente,
+                tentative + 1,
+                MAX_TENTATIVES_HTTP,
+            )
+            time.sleep(attente)
+            continue
+        if r.status_code == 429:
+            attente = ATTENTE_S_SUR_429 + 30.0 * tentative
+            log.warning(
+                "Arctic Shift HTTP 429 — pause %.0fs (%s/%s)…",
+                attente,
+                tentative + 1,
+                MAX_TENTATIVES_HTTP,
+            )
+            time.sleep(attente)
+            continue
+        r.raise_for_status()
+        return r
+    raise RuntimeError("requête Arctic Shift: échec inattendu")
 
 
 def payload_children(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -408,6 +461,98 @@ def extraire_posts_periode(
     return entrees, n_requetes, len(entrees), run_full
 
 
+def extraire_posts_arctic_shift(
+    subreddit: str,
+    ts_deb: float,
+    ts_fin: float,
+    limite_posts: int,
+    sleep_s: float,
+) -> tuple[list[dict[str, Any]], int, int, str]:
+    """
+    Collecte les soumissions via Arctic Shift (archive Reddit), même fenêtre UTC.
+
+    Pagination par created_utc croissant ; dédup par id ; mêmes champs que posts.jsonl.
+    """
+    import requests
+
+    sub = subreddit.strip().removeprefix("r/").strip()
+    by_id: dict[str, dict[str, Any]] = {}
+    n_requetes = 0
+    cursor_after = int(ts_deb)
+    note = "arctic_shift_pagination"
+    session = requests.Session()
+
+    log.info(
+        "Phase Arctic Shift — r/%s (fenêtre UTC [%.0f, %.0f])",
+        sub,
+        ts_deb,
+        ts_fin,
+    )
+
+    while True:
+        if limite_posts and len(by_id) >= limite_posts:
+            note = f"arret_plafond_{limite_posts}"
+            break
+
+        params: dict[str, str | int | None] = {
+            "subreddit": sub,
+            "after": cursor_after,
+            "before": int(ts_fin),
+            "limit": ARCTIC_SHIFT_PAGE_LIMIT,
+            "sort": "asc",
+        }
+        if n_requetes:
+            pause = min(sleep_s, 0.5)
+            log.info("Pause %.1fs avant requête Arctic Shift…", pause)
+            time.sleep(pause)
+        n_requetes += 1
+        r = requete_arctic_shift(session, params)
+        batch = (r.json().get("data") or [])
+        if not batch:
+            note = "arret_liste_vide"
+            break
+
+        plafond_stop = False
+        for d in batch:
+            ent = entree_de_t3(d)
+            if ent is None:
+                continue
+            cu = ent["created_utc"]
+            if not (ts_deb <= cu <= ts_fin):
+                continue
+            if limite_posts and len(by_id) >= limite_posts:
+                plafond_stop = True
+                note = f"arret_plafond_{limite_posts}"
+                break
+            by_id[ent["id"]] = ent
+        if plafond_stop:
+            break
+
+        last_cu = float((batch[-1].get("created_utc") or 0))
+        cursor_after = int(last_cu) + 1
+        log.info(
+            "[arctic-shift] requêtes=%s posts_dans_fenêtre=%s cursor_after=%s",
+            n_requetes,
+            len(by_id),
+            cursor_after,
+        )
+        if cursor_after > int(ts_fin):
+            note = "arret_fin_fenetre"
+            break
+        if len(batch) < ARCTIC_SHIFT_PAGE_LIMIT:
+            note = "arret_derniere_page"
+            break
+
+    entrees = sorted(by_id.values(), key=lambda x: x["created_utc"], reverse=True)
+    log.info(
+        "Extraction Arctic Shift terminée — posts=%s requêtes_http=%s résumé: %s",
+        len(entrees),
+        n_requetes,
+        note,
+    )
+    return entrees, n_requetes, len(entrees), note
+
+
 def extraire_vers_fichiers_bruts(
     chemin_base: str,
     subreddit: str,
@@ -417,6 +562,7 @@ def extraire_vers_fichiers_bruts(
     liste_queries_recherche: list[str],
     elargissement_search: bool,
     sleep_s: float,
+    source: str = "auto",
 ) -> tuple[str, str, int, int, str]:
     """
     Orchestre l'extraction réseau puis l'écriture posts.jsonl + posts.meta.json.
@@ -424,19 +570,50 @@ def extraire_vers_fichiers_bruts(
     Le meta inclut la période, le code d'arrêt, et queries_search_utilisees si /search a tourné.
     Retourne (chemin_jsonl, chemin_meta, n_requêtes_http, n_posts, note_run).
     """
+    import requests
+
     ts_deb, ts_fin, label_plage = bornes_dates_utc_iso(date_debut, date_fin)
-    entrees, n_req, n_posts, run_note = extraire_posts_periode(
-        subreddit=subreddit,
-        ts_deb=ts_deb,
-        ts_fin=ts_fin,
-        limite_posts=limite_posts,
-        liste_queries_recherche=liste_queries_recherche,
-        elargissement_search=elargissement_search,
-        sleep_s=sleep_s,
-    )
+    source_effectif = source
+    if source == "arctic-shift":
+        entrees, n_req, n_posts, run_note = extraire_posts_arctic_shift(
+            subreddit=subreddit,
+            ts_deb=ts_deb,
+            ts_fin=ts_fin,
+            limite_posts=limite_posts,
+            sleep_s=sleep_s,
+        )
+    else:
+        try:
+            entrees, n_req, n_posts, run_note = extraire_posts_periode(
+                subreddit=subreddit,
+                ts_deb=ts_deb,
+                ts_fin=ts_fin,
+                limite_posts=limite_posts,
+                liste_queries_recherche=liste_queries_recherche,
+                elargissement_search=elargissement_search,
+                sleep_s=sleep_s,
+            )
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            if source == "auto" and status == 403:
+                log.warning(
+                    "Reddit HTTP 403 — bascule automatique sur Arctic Shift "
+                    "(archive publique)."
+                )
+                source_effectif = "arctic-shift"
+                entrees, n_req, n_posts, run_note = extraire_posts_arctic_shift(
+                    subreddit=subreddit,
+                    ts_deb=ts_deb,
+                    ts_fin=ts_fin,
+                    limite_posts=limite_posts,
+                    sleep_s=sleep_s,
+                )
+            else:
+                raise
     maintenant = datetime.now(timezone.utc).isoformat()
     meta = {
         "version": 1,
+        "source": source_effectif,
         "subreddit": subreddit.strip().removeprefix("r/").strip(),
         "periode_utc": {
             "debut_ts": ts_deb,
@@ -449,8 +626,14 @@ def extraire_vers_fichiers_bruts(
         "n_requetes": n_req,
         "n_posts": n_posts,
         "code_arret": run_note,
-        "elargissement_search": elargissement_search,
-        "queries_search_utilisees": liste_queries_recherche if elargissement_search else [],
+        "elargissement_search": (
+            elargissement_search if source_effectif != "arctic-shift" else False
+        ),
+        "queries_search_utilisees": (
+            liste_queries_recherche
+            if elargissement_search and source_effectif != "arctic-shift"
+            else []
+        ),
         "instant_extraction_utc": maintenant,
     }
     cj, cm = sauvegarder_posts_bruts(chemin_base, entrees, meta)
@@ -539,6 +722,15 @@ def construire_parser() -> argparse.ArgumentParser:
         metavar="SEC",
         help=f"Pause entre requêtes (défaut: {SLEEP_ENTRE_REQUETES_S}).",
     )
+    p.add_argument(
+        "--source",
+        choices=("auto", "reddit", "arctic-shift"),
+        default="auto",
+        help=(
+            "Source des posts : reddit (API publique), arctic-shift (archive), "
+            "ou auto (reddit puis arctic-shift si HTTP 403)."
+        ),
+    )
     p.add_argument("-v", "--verbose", action="store_true", help="Logs DEBUG.")
     return p
 
@@ -590,6 +782,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         liste_queries_recherche=queries,
         elargissement_search=elargissement,
         sleep_s=args.sleep,
+        source=args.source,
     )
     print(f"OK — JSONL : {cj}")
     print(f"     Meta : {cm}")

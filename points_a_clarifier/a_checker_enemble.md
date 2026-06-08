@@ -66,3 +66,11 @@ Next step:
 
 - enlever les posts qui sont de plus de 1000 charactères
 - gérer les posts avec photos
+
+
+Notes:
+- essayer d'enlever les posts des besoins couverts -> baser sur des descriptions 
+
+
+A faire:
+- [ ] sortir 1000 com. faits en 2025 
